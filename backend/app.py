@@ -13,7 +13,7 @@ def conectar_banco():
             host='localhost',
             database='sus_agendamentos',
             user='root',         # Substitua pelo seu usuário do MySQL
-            password=''          # Substitua pela sua senha do MySQL
+            password='admin123'          # Substitua pela sua senha do MySQL
         )
         return conexao
     except Error as e:

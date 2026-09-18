@@ -10,6 +10,16 @@ document.getElementById('cpf').addEventListener('input', function(e) {
     e.target.value = value;
 });
 
+// Máscara para o campo de busca do CPF
+document.getElementById('cpf-busca').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length > 11) value = value.slice(0, 11);
+    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    e.target.value = value;
+});
+
 // Envio do formulário
 document.getElementById('form-agendamento').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -59,11 +69,17 @@ async function buscarAgendamentos() {
         }
 
         dados.forEach(agendamento => {
+            // Formata o horário para remover os segundos (de "14:00:00" para "14:00")
+            const horarioFormatado = agendamento.horario.substring(0, 5);
+
+            // Converte a data de YYYY-MM-DD para DD/MM/YYYY
+            const dataFormatada = agendamento.data_consulta.split('-').reverse().join('/');
+
             lista.innerHTML += `
                 <div class="agendamento-card">
                     <p><strong>Local:</strong> ${agendamento.local}</p>
                     <p><strong>Especialidade:</strong> ${agendamento.especialidade}</p>
-                    <p><strong>Data/Hora:</strong> ${agendamento.data} às ${agendamento.horario}</p>
+                    <p><strong>Data/Hora:</strong> ${dataFormatada} às ${horarioFormatado}</p>
                     <button onclick="cancelarAgendamento(${agendamento.id})" style="background-color: #dc3545; margin-top: 10px;">Cancelar / Liberar Vaga</button>
                 </div>
             `;
