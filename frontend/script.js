@@ -1,5 +1,5 @@
-// A API_URL agora é vazia, pois o front e o back estão no mesmo domínio
-const API_URL = ''; 
+// Atualize 'SEU-USUARIO' após criar a conta no PythonAnywhere
+const API_URL = '[gsqxz.pythonanywhere.com](gsqxz.pythonanywhere.com)';
 
 function mascararCPF(evento) {
     let value = evento.target.value.replace(/\D/g, '');
