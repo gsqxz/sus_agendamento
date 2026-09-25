@@ -1,26 +1,54 @@
-const API_URL = 'http://127.0.0.1:5000'; // Altere para a URL da nuvem no futuro
+// A API_URL agora é vazia, pois o front e o back estão no mesmo domínio
+const API_URL = ''; 
 
-// Máscara simples para CPF
-document.getElementById('cpf').addEventListener('input', function(e) {
-    let value = e.target.value.replace(/\D/g, '');
+function mascararCPF(evento) {
+    let value = evento.target.value.replace(/\D/g, '');
     if (value.length > 11) value = value.slice(0, 11);
     value = value.replace(/(\d{3})(\d)/, '$1.$2');
     value = value.replace(/(\d{3})(\d)/, '$1.$2');
     value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-    e.target.value = value;
-});
+    evento.target.value = value;
+}
 
-// Máscara para o campo de busca do CPF
-document.getElementById('cpf-busca').addEventListener('input', function(e) {
-    let value = e.target.value.replace(/\D/g, '');
-    if (value.length > 11) value = value.slice(0, 11);
-    value = value.replace(/(\d{3})(\d)/, '$1.$2');
-    value = value.replace(/(\d{3})(\d)/, '$1.$2');
-    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-    e.target.value = value;
-});
+document.getElementById('cpf').addEventListener('input', mascararCPF);
+document.getElementById('cpf-busca').addEventListener('input', mascararCPF);
 
-// Envio do formulário
+const dataInput = document.getElementById('data');
+const hoje = new Date().toISOString().split('T')[0];
+dataInput.setAttribute('min', hoje);
+
+dataInput.addEventListener('change', gerarHorarios);
+
+function gerarHorarios() {
+    const selectHorario = document.getElementById('horario');
+    selectHorario.innerHTML = '<option value="" disabled selected>Selecione...</option>';
+    
+    const dataSelecionada = document.getElementById('data').value;
+    if (!dataSelecionada) return;
+
+    const agora = new Date();
+    const ehHoje = (dataSelecionada === hoje);
+
+    for (let h = 8; h <= 16; h++) {
+        if (h === 12) continue; 
+        
+        for (let m = 0; m < 60; m += 15) {
+            let horaStr = h.toString().padStart(2, '0');
+            let minStr = m.toString().padStart(2, '0');
+            let horarioValor = `${horaStr}:${minStr}`;
+
+            if (ehHoje) {
+                let horaAtual = agora.getHours();
+                let minAtual = agora.getMinutes();
+                if (h < horaAtual || (h === horaAtual && m <= minAtual)) {
+                    continue; 
+                }
+            }
+            selectHorario.innerHTML += `<option value="${horarioValor}">${horarioValor}</option>`;
+        }
+    }
+}
+
 document.getElementById('form-agendamento').addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -42,8 +70,10 @@ document.getElementById('form-agendamento').addEventListener('submit', async (e)
         if (response.ok) {
             alert('Consulta agendada com sucesso!');
             document.getElementById('form-agendamento').reset();
+            document.getElementById('horario').innerHTML = '<option value="" disabled selected>Selecione a data primeiro...</option>';
         } else {
-            alert('Erro ao agendar consulta. Verifique os dados.');
+            const errorData = await response.json();
+            alert(errorData.erro || 'Erro ao agendar consulta. Verifique os dados.');
         }
     } catch (error) {
         console.error('Erro:', error);
@@ -51,10 +81,9 @@ document.getElementById('form-agendamento').addEventListener('submit', async (e)
     }
 });
 
-// Busca de agendamentos por CPF
 async function buscarAgendamentos() {
     const cpf = document.getElementById('cpf-busca').value;
-    if (!cpf) return alert("Digite um CPF.");
+    if (!cpf) return alert("Digite um CPF válido.");
 
     try {
         const response = await fetch(`${API_URL}/agendamentos/${cpf}`);
@@ -64,15 +93,12 @@ async function buscarAgendamentos() {
         lista.innerHTML = '';
 
         if (dados.length === 0) {
-            lista.innerHTML = '<p>Nenhum agendamento encontrado.</p>';
+            lista.innerHTML = '<p style="margin-top:15px; color: #555;">Nenhum agendamento ativo encontrado para este CPF.</p>';
             return;
         }
 
         dados.forEach(agendamento => {
-            // Formata o horário para remover os segundos (de "14:00:00" para "14:00")
             const horarioFormatado = agendamento.horario.substring(0, 5);
-
-            // Converte a data de YYYY-MM-DD para DD/MM/YYYY
             const dataFormatada = agendamento.data_consulta.split('-').reverse().join('/');
 
             lista.innerHTML += `
@@ -90,8 +116,8 @@ async function buscarAgendamentos() {
 }
 
 async function cancelarAgendamento(id) {
-    if(confirm("Deseja realmente cancelar esta consulta?")) {
+    if(confirm("Deseja realmente cancelar esta consulta? A vaga será liberada para outro paciente.")) {
         await fetch(`${API_URL}/agendamentos/${id}`, { method: 'DELETE' });
-        buscarAgendamentos(); // Recarrega a lista
+        buscarAgendamentos(); 
     }
 }
