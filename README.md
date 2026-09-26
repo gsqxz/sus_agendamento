@@ -117,8 +117,8 @@ O front-end está configurado para consumir a API local em `http://127.0.0.1:500
 Na configuração inicial do sistema, o usuário administrativo criado automaticamente é:
 
 ```text
-Usuário: controlador_sus
-Senha: admin123
+Usuário: ***
+Senha: ***
 ```
 
 Altere essas credenciais antes de um uso em produção. Atualmente, o estado de login do painel é mantido no `sessionStorage` do navegador; para ambientes públicos, recomenda-se evoluir a autenticação para sessões ou tokens validados também no back-end e proteger as rotas administrativas na API.
