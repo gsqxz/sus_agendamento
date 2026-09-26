@@ -105,3 +105,70 @@ th {
     background-color: #005b9f;
     color: white;
 }
+
+/* --- MODAL DE ALERTA CUSTOMIZADO --- */
+#alerta-overlay {
+    display: none; 
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%; 
+    background: rgba(0,0,0,0.6); 
+    z-index: 9999;
+}
+
+#alerta-modal {
+    display: none; 
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: white; padding: 25px; border-radius: 8px; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    z-index: 10000; width: 90%; max-width: 350px; 
+    text-align: center;
+}
+
+#alerta-mensagem { 
+    margin-bottom: 20px; font-size: 16px; color: #333; line-height: 1.5; 
+}
+
+.btn-alerta-ok { 
+    background-color: #28a745; /* Verde */
+    width: 100%; 
+    font-weight: bold; 
+    font-size: 16px;
+}
+
+.btn-alerta-ok:hover { 
+    background-color: #218838; 
+}
+
+/* --- MODAL DE CONFIRMAÇÃO CUSTOMIZADO (SIM / NÃO) --- */
+#confirm-overlay {
+    display: none; position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%; background: rgba(0,0,0,0.6); 
+    z-index: 9999;
+}
+
+#confirm-modal {
+    display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: white; padding: 25px; border-radius: 8px; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    z-index: 10000; width: 90%; max-width: 350px; text-align: center;
+}
+
+#confirm-mensagem { 
+    margin-bottom: 20px; font-size: 16px; color: #333; line-height: 1.5; 
+}
+
+.botoes-confirm {
+    display: flex; gap: 10px; justify-content: center;
+}
+
+.btn-confirm-sim { 
+    background-color: #dc3545; color: white; padding: 10px 20px; 
+    border: none; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;
+}
+.btn-confirm-sim:hover { background-color: #c82333; }
+
+.btn-confirm-nao { 
+    background-color: #6c757d; color: white; padding: 10px 20px; 
+    border: none; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;
+}
+.btn-confirm-nao:hover { background-color: #5a6268; }

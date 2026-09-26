@@ -5,99 +5,357 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel ADMIN - SUS</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        #modal-overlay-remarcar { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; }
+        #modal-remarcar { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 1000; width: 90%; max-width: 400px; }
+        .btn-acao { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 12px; margin-right: 5px; }
+        .btn-vermelho { background-color: #dc3545; }
+        .btn-amarelo { background-color: #ffc107; color: #333; }
+        .btn-cinza { background-color: #6c757d; }
+        .btn-sair { background-color: #333; padding: 10px 20px; font-size: 14px; margin-top: 20px; float: right; }
+        .botoes-modal { display: flex; gap: 10px; margin-top: 15px; }
+    </style>
 </head>
 <body>
     <header>
         <h1>Painel do Controlador - UBS</h1>
         <div style="margin-top: 15px;">
-            <a href="index.html" style="color: #cce5ff; text-decoration: underline; font-size: 14px;">Voltar para Marcação de Consultas</a>
+            <a href="index.html" style="color: #cce5ff; text-decoration: underline; font-size: 14px;">Voltar para Marcação</a>
         </div>
     </header>
-    <main style="max-width: 900px;">
+    <main style="max-width: 1100px;">
         <section id="login-section" style="max-width: 400px; margin: 0 auto;">
             <h2>Acesso Restrito</h2>
-            <p style="margin-bottom: 15px; font-size: 14px;">Insira suas credenciais governamentais.</p>
             <input type="text" id="usuario" placeholder="Usuário">
             <input type="password" id="senha" placeholder="Senha">
-            <button onclick="fazerLogin()">Entrar no Sistema</button>
+            <button type="button" onclick="fazerLogin()">Entrar no Sistema</button>
         </section>
 
         <section id="dashboard-section" style="display: none;">
-            <h2>Todos os Agendamentos do Sistema</h2>
-            <button onclick="carregarTodos()" style="margin-bottom: 15px; max-width: 200px;">Atualizar Tabela</button>
+            <h2>Todos os Agendamentos</h2>
+            <button type="button" onclick="carregarTodos()" style="margin-bottom: 15px; max-width: 200px;">Atualizar Tabela</button>
             <div style="overflow-x: auto;">
                 <table>
                     <thead>
                         <tr>
                             <th>ID</th>
+                            <th>Paciente</th>
                             <th>CPF</th>
                             <th>Local</th>
                             <th>Especialidade</th>
                             <th>Data</th>
                             <th>Horário</th>
                             <th>Status</th>
+                            <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody id="tabela-corpo"></tbody>
                 </table>
             </div>
+            <!-- O botão de Logout foi realocado para o final da tabela -->
+            <div style="text-align: right; margin-top: 15px;">
+                <button type="button" class="btn-acao btn-sair" style="float: none;" onclick="fazerLogout()">Sair (Logout)</button>
+            </div>
         </section>
     </main>
 
+    <!-- Modal de Remarcação -->
+    <div id="modal-overlay-remarcar"></div>
+    <div id="modal-remarcar">
+        <h3>Remarcar Consulta</h3>
+        <p style="margin-bottom: 15px; font-size: 14px; color: #555;">ID: <span id="modal-id"></span></p>
+        
+        <label>Nova Data:</label>
+        <input type="date" id="nova-data" required onchange="gerarHorariosAdminModal()">
+        
+        <label>Novo Horário:</label>
+        <select id="novo-horario" required>
+            <option value="" disabled selected>Selecione a data primeiro...</option>
+        </select>
+        
+        <div class="botoes-modal">
+            <button type="button" onclick="salvarRemarcacao()" style="background-color: #28a745;">Salvar</button>
+            <button type="button" onclick="fecharModal()" style="background-color: #6c757d;">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Modais Customizados de Alerta e Confirmação -->
+    <div id="alerta-overlay"></div>
+    <div id="alerta-modal">
+        <p id="alerta-mensagem"></p>
+        <button type="button" id="btn-alerta-ok" class="btn-alerta-ok">OK</button>
+    </div>
+
+    <div id="confirm-overlay"></div>
+    <div id="confirm-modal">
+        <p id="confirm-mensagem"></p>
+        <div class="botoes-confirm">
+            <button type="button" id="btn-confirm-sim" class="btn-confirm-sim">Sim</button>
+            <button type="button" id="btn-confirm-nao" class="btn-confirm-nao">Não</button>
+        </div>
+    </div>
+
     <script>
-        // Atualize 'SEU-USUARIO' após criar a conta no PythonAnywhere
-        const API_URL = 'https://gsqxz.pythonanywhere.com';
+        const API_URL = 'http://127.0.0.1:5000'; // ALERTA: Mude para produção depois
+        
+        let idAgendamentoEmFoco = null;
+        let horarioAnteriorDoAgendamento = null;
+        let dataAnteriorDoAgendamento = null;
+        let localAgendamentoEmFoco = null;
+        let especialidadeAgendamentoEmFoco = null;
+
+        function mostrarAlerta(mensagem) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('alerta-modal');
+                const overlay = document.getElementById('alerta-overlay');
+                const texto = document.getElementById('alerta-mensagem');
+                const btnOk = document.getElementById('btn-alerta-ok');
+
+                texto.innerText = mensagem;
+                overlay.style.display = 'block';
+                modal.style.display = 'block';
+
+                const novoBtnOk = btnOk.cloneNode(true);
+                btnOk.parentNode.replaceChild(novoBtnOk, btnOk);
+
+                novoBtnOk.addEventListener('click', () => {
+                    overlay.style.display = 'none';
+                    modal.style.display = 'none';
+                    resolve(); 
+                });
+            });
+        }
+
+        function fecharAlerta() {
+            document.getElementById('alerta-overlay').style.display = 'none';
+            document.getElementById('alerta-modal').style.display = 'none';
+        }
+
+        function mostrarConfirm(mensagem) {
+            return new Promise((resolve) => {
+                document.getElementById('confirm-mensagem').innerText = mensagem;
+                document.getElementById('confirm-overlay').style.display = 'block';
+                document.getElementById('confirm-modal').style.display = 'block';
+
+                const btnSim = document.getElementById('btn-confirm-sim');
+                const btnNao = document.getElementById('btn-confirm-nao');
+
+                btnSim.onclick = null;
+                btnNao.onclick = null;
+
+                setTimeout(() => {
+                    btnSim.onclick = () => { fecharConfirm(); resolve(true); };
+                    btnNao.onclick = () => { fecharConfirm(); resolve(false); };
+                }, 150);
+            });
+        }
+
+        function fecharConfirm() {
+            document.getElementById('confirm-overlay').style.display = 'none';
+            document.getElementById('confirm-modal').style.display = 'none';
+        }
+
+        window.onload = function() {
+            if (sessionStorage.getItem('adminLogado') === 'true') {
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('dashboard-section').style.display = 'block';
+                carregarTodos();
+            }
+        };
 
         async function fazerLogin() {
             const usuario = document.getElementById('usuario').value;
             const senha = document.getElementById('senha').value;
-
             try {
                 const res = await fetch(`${API_URL}/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ usuario, senha })
                 });
-
                 if (res.ok) {
+                    sessionStorage.setItem('adminLogado', 'true');
                     document.getElementById('login-section').style.display = 'none';
                     document.getElementById('dashboard-section').style.display = 'block';
                     carregarTodos();
                 } else {
-                    alert("Usuário ou senha incorretos.");
+                    await mostrarAlerta("Usuário ou senha incorretos.");
                 }
-            } catch (error) {
-                alert("Erro de conexão com o servidor.");
-            }
+            } catch (error) { await mostrarAlerta("Erro de conexão com o servidor."); }
+        }
+
+        function fazerLogout() {
+            sessionStorage.removeItem('adminLogado');
+            location.reload();
         }
 
         async function carregarTodos() {
-            try {
-                const res = await fetch(`${API_URL}/admin/todos`);
-                const dados = await res.json();
-                const tbody = document.getElementById('tabela-corpo');
-                tbody.innerHTML = '';
+            const res = await fetch(`${API_URL}/admin/todos`);
+            const dados = await res.json();
+            const tbody = document.getElementById('tabela-corpo');
+            tbody.innerHTML = '';
 
-                dados.forEach(a => {
-                    const dataFormatada = a.data_consulta.split('-').reverse().join('/');
-                    const horarioFormatado = a.horario.substring(0, 5);
-                    const corStatus = a.status === 'Cancelado' ? 'color: #dc3545;' : 'color: #28a745;';
+            dados.forEach(a => {
+                const dataF = a.data_consulta.split('-').reverse().join('/');
+                const horF = a.horario.substring(0, 5);
+                const corStatus = a.status === 'Cancelado' ? 'color: #dc3545;' : 'color: #28a745;';
 
-                    tbody.innerHTML += `
-                        <tr>
-                            <td>${a.id}</td>
-                            <td>${a.cpf}</td>
-                            <td>${a.local}</td>
-                            <td>${a.especialidade}</td>
-                            <td>${dataFormatada}</td>
-                            <td>${horarioFormatado}</td>
-                            <td style="font-weight: bold; ${corStatus}">${a.status}</td>
-                        </tr>
+                // Lógica Condicional de Ações do ADMIN (Botão novo de HARD DELETE)
+                let botoesAcao = '';
+                if (a.status === 'Ativo') {
+                    botoesAcao = `
+                        <button type="button" onclick="cancelar(${a.id})" class="btn-acao btn-vermelho">Cancelar</button>
+                        <button type="button" onclick="abrirModal(${a.id}, '${a.data_consulta}', '${horF}', '${a.local}', '${a.especialidade}')" class="btn-acao btn-amarelo">Remarcar</button>
                     `;
-                });
-            } catch(error) {
-                alert("Erro ao carregar os dados.");
+                } else {
+                    // Quando estiver cancelado, ele mostra a opção de limpar do sistema definitivamente
+                    botoesAcao = `
+                        <button type="button" onclick="limparRegistro(${a.id})" class="btn-acao btn-cinza">Limpar Registro</button>
+                    `;
+                }
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${a.id}</td>
+                        <td>${a.nome}</td>
+                        <td>${a.cpf}</td>
+                        <td>${a.local}</td>
+                        <td>${a.especialidade}</td>
+                        <td>${dataF}</td>
+                        <td>${horF}</td>
+                        <td style="font-weight: bold; ${corStatus}">${a.status}</td>
+                        <td style="min-width: 150px; text-align: center;">
+                            ${botoesAcao}
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function cancelar(id) {
+            const confirmou = await mostrarConfirm("Deseja cancelar este agendamento (Soft Delete)?");
+            
+            if (confirmou) {
+                try {
+                    await fetch(`${API_URL}/agendamentos/${id}`, { method: 'DELETE' });
+                    await mostrarAlerta("Agendamento cancelado com sucesso!");
+                    carregarTodos();
+                } catch (error) {
+                    await mostrarAlerta("Erro ao cancelar.");
+                }
             }
+        }
+
+        // Função para Excluir Permanentemente do Banco (Hard Delete)
+        async function limparRegistro(id) {
+            const confirmou = await mostrarConfirm("Deseja realmente excluir este registro permanentemente do banco de dados? Esta ação não pode ser desfeita.");
+            
+            if (confirmou) {
+                try {
+                    const res = await fetch(`${API_URL}/admin/agendamentos/${id}/limpar`, { method: 'DELETE' });
+                    if(res.ok) {
+                        await mostrarAlerta("Registro removido do banco de dados com sucesso!");
+                        carregarTodos();
+                    } else {
+                        const err = await res.json();
+                        await mostrarAlerta(err.erro || "Erro ao tentar limpar o registro.");
+                    }
+                } catch (error) {
+                    await mostrarAlerta("Erro de conexão ao tentar limpar.");
+                }
+            }
+        }
+
+        function abrirModal(id, dataAtual, horarioAtual, local, especialidade) {
+            idAgendamentoEmFoco = id;
+            horarioAnteriorDoAgendamento = horarioAtual;
+            dataAnteriorDoAgendamento = dataAtual;
+            localAgendamentoEmFoco = local;
+            especialidadeAgendamentoEmFoco = especialidade;
+            
+            document.getElementById('modal-id').innerText = id;
+            const hoje = new Date().toISOString().split('T')[0];
+            document.getElementById('nova-data').setAttribute('min', hoje);
+            document.getElementById('nova-data').value = dataAtual;
+
+            gerarHorariosAdminModal();
+
+            document.getElementById('modal-overlay-remarcar').style.display = 'block';
+            document.getElementById('modal-remarcar').style.display = 'block';
+        }
+
+        function fecharModal() {
+            document.getElementById('modal-overlay-remarcar').style.display = 'none';
+            document.getElementById('modal-remarcar').style.display = 'none';
+        }
+
+        async function gerarHorariosAdminModal() {
+            const selectHorario = document.getElementById('novo-horario');
+            const dataSelecionada = document.getElementById('nova-data').value;
+            selectHorario.innerHTML = '<option value="" disabled selected>Buscando disponibilidade...</option>';
+            
+            if(!dataSelecionada) return;
+
+            try {
+                const res = await fetch(`${API_URL}/horarios-ocupados?data=${dataSelecionada}&local=${localAgendamentoEmFoco}&especialidade=${especialidadeAgendamentoEmFoco}`);
+                const ocupados = await res.json();
+
+                selectHorario.innerHTML = '<option value="" disabled selected>Selecione um novo horário...</option>';
+                const agora = new Date();
+                const hojeStr = agora.toISOString().split('T')[0];
+                const ehHoje = (dataSelecionada === hojeStr);
+
+                for (let h = 8; h <= 16; h++) {
+                    if (h === 12) continue; 
+                    for (let m = 0; m < 60; m += 15) {
+                        let horaStr = h.toString().padStart(2, '0');
+                        let minStr = m.toString().padStart(2, '0');
+                        let horarioValor = `${horaStr}:${minStr}`;
+
+                        if (ehHoje) {
+                            let horaAtual = agora.getHours();
+                            let minAtual = agora.getMinutes();
+                            if (h < horaAtual || (h === horaAtual && m <= minAtual)) continue; 
+                        }
+
+                        if (horarioValor === horarioAnteriorDoAgendamento && dataSelecionada === dataAnteriorDoAgendamento) {
+                            selectHorario.innerHTML += `<option value="${horarioValor}" disabled style="color: gray;">🚫 ${horarioValor} - Horário já agendado (Atual)</option>`;
+                        } else if (ocupados.includes(horarioValor)) {
+                            selectHorario.innerHTML += `<option value="${horarioValor}" disabled style="color: red;">🚫 ${horarioValor} - Ocupado</option>`;
+                        } else {
+                            selectHorario.innerHTML += `<option value="${horarioValor}">${horarioValor}</option>`;
+                        }
+                    }
+                }
+            } catch (error) {
+                selectHorario.innerHTML = '<option value="" disabled selected>Erro ao carregar horários</option>';
+            }
+        }
+
+        async function salvarRemarcacao() {
+            const data = document.getElementById('nova-data').value;
+            const horario = document.getElementById('novo-horario').value;
+
+            if(!data || !horario) {
+                await mostrarAlerta("Preencha data e horário válidos.");
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/admin/agendamentos/${idAgendamentoEmFoco}/remarcar`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data, horario })
+                });
+
+                if (res.ok) {
+                    await mostrarAlerta("Remarcado com sucesso!");
+                    fecharModal();
+                    carregarTodos();
+                } else {
+                    const err = await res.json();
+                    await mostrarAlerta(err.erro);
+                }
+            } catch (error) { await mostrarAlerta("Erro ao remarcar."); }
         }
     </script>
 </body>
