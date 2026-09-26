@@ -1,5 +1,7 @@
 # Agendamento Digital SUS
 
+[Acesse a aplicação online](https://gsqxz.github.io/sus_agendamento/)
+
 O **Agendamento Digital SUS** é uma aplicação web Full-Stack criada para facilitar o agendamento e o acompanhamento de consultas médicas nas Unidades Básicas de Saúde (UBS) da região de Patrocínio-MG. A solução busca ampliar o acesso da população aos serviços de saúde por meio de um fluxo simples, digital e integrado a uma API REST.
 
 ## Arquitetura
