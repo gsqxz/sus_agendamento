@@ -1,5 +1,54 @@
-// Atualize 'SEU-USUARIO' após criar a conta no PythonAnywhere
-const API_URL = 'https://gsqxz.pythonanywhere.com';
+// const API_URL = 'https://gsqxz.pythonanywhere.com'; // <-- PRODUÇÃO (Comentado)
+const API_URL = 'http://127.0.0.1:5000'; // ALERTA: Mude para produção quando for subir
+
+// --- CONTROLE DOS ALERTAS ---
+function mostrarAlerta(mensagem) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('alerta-modal');
+        const overlay = document.getElementById('alerta-overlay');
+        const texto = document.getElementById('alerta-mensagem');
+        const btnOk = document.getElementById('btn-alerta-ok');
+
+        texto.innerText = mensagem;
+        overlay.style.display = 'block';
+        modal.style.display = 'block';
+
+        // Remove qualquer evento anterior para não duplicar cliques
+        const novoBtnOk = btnOk.cloneNode(true);
+        btnOk.parentNode.replaceChild(novoBtnOk, btnOk);
+
+        novoBtnOk.addEventListener('click', () => {
+            overlay.style.display = 'none';
+            modal.style.display = 'none';
+            resolve(); // Só agora o código continua e permite o reload/limpeza da página
+        });
+    });
+}
+
+function fecharAlerta() {
+    document.getElementById('alerta-overlay').style.display = 'none';
+    document.getElementById('alerta-modal').style.display = 'none';
+}
+
+function mostrarConfirm(mensagem) {
+    return new Promise((resolve) => {
+        document.getElementById('confirm-mensagem').innerText = mensagem;
+        document.getElementById('confirm-overlay').style.display = 'block';
+        document.getElementById('confirm-modal').style.display = 'block';
+
+        const btnSim = document.getElementById('btn-confirm-sim');
+        const btnNao = document.getElementById('btn-confirm-nao');
+
+        btnSim.onclick = () => { fecharConfirm(); resolve(true); };
+        btnNao.onclick = () => { fecharConfirm(); resolve(false); };
+    });
+}
+
+function fecharConfirm() {
+    document.getElementById('confirm-overlay').style.display = 'none';
+    document.getElementById('confirm-modal').style.display = 'none';
+}
+// ---------------------------------------
 
 function mascararCPF(evento) {
     let value = evento.target.value.replace(/\D/g, '');
@@ -17,35 +66,54 @@ const dataInput = document.getElementById('data');
 const hoje = new Date().toISOString().split('T')[0];
 dataInput.setAttribute('min', hoje);
 
+document.getElementById('local').addEventListener('change', gerarHorarios);
+document.getElementById('especialidade').addEventListener('change', gerarHorarios);
 dataInput.addEventListener('change', gerarHorarios);
 
-function gerarHorarios() {
+async function gerarHorarios() {
     const selectHorario = document.getElementById('horario');
-    selectHorario.innerHTML = '<option value="" disabled selected>Selecione...</option>';
-    
+    const localSelecionado = document.getElementById('local').value;
+    const especialidadeSelecionada = document.getElementById('especialidade').value;
     const dataSelecionada = document.getElementById('data').value;
-    if (!dataSelecionada) return;
 
-    const agora = new Date();
-    const ehHoje = (dataSelecionada === hoje);
+    if (!localSelecionado || !especialidadeSelecionada || !dataSelecionada) {
+        selectHorario.innerHTML = '<option value="" disabled selected>Preencha Unidade, Especialidade e Data...</option>';
+        return;
+    }
 
-    for (let h = 8; h <= 16; h++) {
-        if (h === 12) continue; 
-        
-        for (let m = 0; m < 60; m += 15) {
-            let horaStr = h.toString().padStart(2, '0');
-            let minStr = m.toString().padStart(2, '0');
-            let horarioValor = `${horaStr}:${minStr}`;
+    selectHorario.innerHTML = '<option value="" disabled selected>Buscando horários disponíveis...</option>';
 
-            if (ehHoje) {
-                let horaAtual = agora.getHours();
-                let minAtual = agora.getMinutes();
-                if (h < horaAtual || (h === horaAtual && m <= minAtual)) {
-                    continue; 
+    try {
+        const res = await fetch(`${API_URL}/horarios-ocupados?data=${dataSelecionada}&local=${localSelecionado}&especialidade=${especialidadeSelecionada}`);
+        const ocupados = await res.json();
+
+        selectHorario.innerHTML = '<option value="" disabled selected>Selecione o horário...</option>';
+        const agora = new Date();
+        const ehHoje = (dataSelecionada === hoje);
+
+        for (let h = 8; h <= 16; h++) {
+            if (h === 12) continue; 
+            
+            for (let m = 0; m < 60; m += 15) {
+                let horaStr = h.toString().padStart(2, '0');
+                let minStr = m.toString().padStart(2, '0');
+                let horarioValor = `${horaStr}:${minStr}`;
+
+                if (ehHoje) {
+                    let horaAtual = agora.getHours();
+                    let minAtual = agora.getMinutes();
+                    if (h < horaAtual || (h === horaAtual && m <= minAtual)) continue; 
+                }
+
+                if (ocupados.includes(horarioValor)) {
+                    selectHorario.innerHTML += `<option value="${horarioValor}" disabled style="color: red;">🚫 ${horarioValor} - Ocupado</option>`;
+                } else {
+                    selectHorario.innerHTML += `<option value="${horarioValor}">${horarioValor}</option>`;
                 }
             }
-            selectHorario.innerHTML += `<option value="${horarioValor}">${horarioValor}</option>`;
         }
+    } catch (error) {
+        selectHorario.innerHTML = '<option value="" disabled selected>Erro ao carregar</option>';
     }
 }
 
@@ -53,6 +121,7 @@ document.getElementById('form-agendamento').addEventListener('submit', async (e)
     e.preventDefault();
     
     const dados = {
+        nome: document.getElementById('nome').value,
         cpf: document.getElementById('cpf').value,
         local: document.getElementById('local').value,
         especialidade: document.getElementById('especialidade').value,
@@ -68,56 +137,64 @@ document.getElementById('form-agendamento').addEventListener('submit', async (e)
         });
         
         if (response.ok) {
-            alert('Consulta agendada com sucesso!');
+            await mostrarAlerta('Consulta agendada com sucesso!'); // AWAIT força a pausa
             document.getElementById('form-agendamento').reset();
-            document.getElementById('horario').innerHTML = '<option value="" disabled selected>Selecione a data primeiro...</option>';
+            document.getElementById('horario').innerHTML = '<option value="" disabled selected>Preencha Unidade, Especialidade e Data...</option>';
         } else {
             const errorData = await response.json();
-            alert(errorData.erro || 'Erro ao agendar consulta. Verifique os dados.');
+            await mostrarAlerta(errorData.erro || 'Erro ao agendar.');
         }
-    } catch (error) {
-        console.error('Erro:', error);
-        alert('Erro de conexão com o servidor.');
+    } catch (error) { 
+        await mostrarAlerta('Erro de conexão com o servidor.'); 
     }
 });
 
 async function buscarAgendamentos() {
     const cpf = document.getElementById('cpf-busca').value;
-    if (!cpf) return alert("Digite um CPF válido.");
+    if (!cpf) {
+        await mostrarAlerta("Digite um CPF válido.");
+        return;
+    }
 
     try {
         const response = await fetch(`${API_URL}/agendamentos/${cpf}`);
         const dados = await response.json();
-        
         const lista = document.getElementById('lista-agendamentos');
         lista.innerHTML = '';
 
         if (dados.length === 0) {
-            lista.innerHTML = '<p style="margin-top:15px; color: #555;">Nenhum agendamento ativo encontrado para este CPF.</p>';
+            lista.innerHTML = '<p style="margin-top:15px; color: #555;">Nenhum agendamento ativo encontrado.</p>';
             return;
         }
 
-        dados.forEach(agendamento => {
-            const horarioFormatado = agendamento.horario.substring(0, 5);
-            const dataFormatada = agendamento.data_consulta.split('-').reverse().join('/');
-
+        dados.forEach(a => {
+            const horarioF = a.horario.substring(0, 5);
+            const dataF = a.data_consulta.split('-').reverse().join('/');
             lista.innerHTML += `
                 <div class="agendamento-card">
-                    <p><strong>Local:</strong> ${agendamento.local}</p>
-                    <p><strong>Especialidade:</strong> ${agendamento.especialidade}</p>
-                    <p><strong>Data/Hora:</strong> ${dataFormatada} às ${horarioFormatado}</p>
-                    <button onclick="cancelarAgendamento(${agendamento.id})" style="background-color: #dc3545; margin-top: 10px;">Cancelar / Liberar Vaga</button>
+                    <p><strong>Paciente:</strong> ${a.nome}</p>
+                    <p><strong>Local:</strong> ${a.local}</p>
+                    <p><strong>Especialidade:</strong> ${a.especialidade}</p>
+                    <p><strong>Data/Hora:</strong> ${dataF} às ${horarioF}</p>
+                    <button type="button" onclick="cancelarAgendamento(${a.id})" style="background-color: #dc3545; margin-top: 10px;">Cancelar / Liberar Vaga</button>
                 </div>
             `;
         });
-    } catch (error) {
-        alert('Erro ao buscar agendamentos.');
+    } catch (error) { 
+        await mostrarAlerta('Erro ao buscar os agendamentos.'); 
     }
 }
 
 async function cancelarAgendamento(id) {
-    if(confirm("Deseja realmente cancelar esta consulta? A vaga será liberada para outro paciente.")) {
-        await fetch(`${API_URL}/agendamentos/${id}`, { method: 'DELETE' });
-        buscarAgendamentos(); 
+    const confirmou = await mostrarConfirm("Deseja realmente cancelar? A vaga será liberada.");
+    
+    if (confirmou) {
+        try {
+            await fetch(`${API_URL}/agendamentos/${id}`, { method: 'DELETE' });
+            await mostrarAlerta("Consulta cancelada com sucesso."); // AWAIT aqui também
+            buscarAgendamentos(); 
+        } catch (error) {
+            await mostrarAlerta("Erro ao cancelar.");
+        }
     }
 }
