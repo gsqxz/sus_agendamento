@@ -1,5 +1,4 @@
-// const API_URL = 'https://gsqxz.pythonanywhere.com'; // <-- PRODUÇÃO (Comentado)
-const API_URL = 'http://127.0.0.1:5000'; // ALERTA: Mude para produção quando for subir
+const API_URL = 'https://gsqxz.pythonanywhere.com';
 
 // --- CONTROLE DOS ALERTAS ---
 function mostrarAlerta(mensagem) {
